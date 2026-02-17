@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .result-content {
+            color: #333;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .trends-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 6px;
+        }
+
+        .trends-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .trend-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .download-btn {
+            background: #28a745;
+            margin-top: 20px;
+            width: auto;
+            padding: 10px 20px;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .error {
+            background: #fee;
+            border-left-color: #e74c3c;
+            color: #c0392b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>📰 Newsletter Generator</h1>
+        
+        <form id="newsletterForm">
+            <div class="form-group">
+                <label for="topic">Newsletter Topic *</label>
+                <input type="text" id="topic" name="topic" required placeholder="Technology trends, Marketing insights, Startup news">
+            </div>
+
+            <div class="form-group">
+                <label for="audience">Target Audience</label>
+                <input type="text" id="audience" name="audience" placeholder="Entrepreneurs, Developers, Marketers">
+            </div>
+
+            <div class="form-group">
+                <label for="sections">Newsletter Type</label>
+                <select id="sections" name="sections">
+                    <option value="weekly">Weekly Newsletter</option>
+                    <option value="daily">Daily Newsletter</option>
+                    <option value="monthly">Monthly Newsletter</option>
+                    <option value="special">Special Edition</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="includeTrends" name="includeTrends" checked>
+                    <label for="includeTrends">Include trending topics from Reddit</label>
+                </div>
+            </div>
+
+            <button type="submit" id="generateBtn">Generate Newsletter</button>
+        </form>
+
+        <div id="result" class="result-container"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('newsletterForm');
+        const resultDiv = document.getElementById('result');
+        const generateBtn = document.getElementById('generateBtn');
+        let currentNewsletter = null;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const topic = document.getElementById('topic').value.trim();
+            const audience = document.getElementById('audience').value.trim();
+            const sections = document.getElementById('sections').value;
+            const includeTrends = document.getElementById('includeTrends').checked;
+
+            if (!topic) {
+                showError('Topic is required');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating Newsletter...';
+            resultDiv.className = 'result-container loading';
+            resultDiv.textContent = 'Generating your newsletter';
+            resultDiv.classList.add('show');
+
+            try {
+                const response = await fetch('/api/newsletter/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ topic, audience, sections, includeTrends })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error + (data.details ? ': ' + data.details : ''));
+                } else if (data.success && data.newsletter) {
+                    currentNewsletter = data.newsletter;
+                    showNewsletter(data.newsletter);
+                } else {
+                    showError('Unexpected response format');
+                }
+            } catch (error) {
+                showError('Failed to generate newsletter: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Newsletter';
+            }
+        });
+
+        function showNewsletter(newsletter) {
+            let trendsHtml = '';
+            if (newsletter.trends && newsletter.trends.length > 0) {
+                trendsHtml = `
+                    <div class="trends-section">
+                        <h3>📈 Trending Topics</h3>
+                        ${newsletter.trends.map(trend => `
+                            <div class="trend-item">
+                                <strong>${escapeHtml(trend.title)}</strong> (r/${escapeHtml(trend.subreddit)})
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            const html = `
+                <div class="result-title">✅ Generated ${newsletter.sections} Newsletter</div>
+                <div class="result-content">${escapeHtml(newsletter.content)}</div>
+                ${trendsHtml}
+                <button class="download-btn" onclick="downloadNewsletter()">📥 Download Newsletter</button>
+            `;
+
+            resultDiv.className = 'result-container show';
+            resultDiv.innerHTML = html;
+        }
+
+        function showError(message) {
+            resultDiv.className = 'result-container show error';
+            resultDiv.innerHTML = `<div class="result-title">❌ Error:</div><div>${escapeHtml(message)}</div>`;
+        }
+
+        function downloadNewsletter() {
+            if (!currentNewsletter) {
+                alert('No newsletter to download');
+                return;
+            }
+
+            const content = `NEWSLETTER: ${currentNewsletter.topic}\n${'='.repeat(50)}\n\n${currentNewsletter.content}`;
+            const filename = `newsletter_${currentNewsletter.topic.replace(/\s+/g, '_')}_${Date.now()}.txt`;
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

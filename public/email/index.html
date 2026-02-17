@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cold Email Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .result-content {
+            color: #333;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            margin-top: 15px;
+            width: auto;
+            padding: 10px 20px;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .error {
+            background: #fee;
+            border-left-color: #e74c3c;
+            color: #c0392b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>📧 Cold Email Generator</h1>
+        
+        <form id="emailForm">
+            <div class="form-group">
+                <label for="recipientName">Recipient Name *</label>
+                <input type="text" id="recipientName" name="recipientName" required placeholder="Sarah Johnson">
+            </div>
+
+            <div class="form-group">
+                <label for="recipientCompany">Company Name</label>
+                <input type="text" id="recipientCompany" name="recipientCompany" placeholder="Tech Corp Inc.">
+            </div>
+
+            <div class="form-group">
+                <label for="purpose">Email Purpose *</label>
+                <textarea id="purpose" name="purpose" required placeholder="Introducing our new product, requesting a meeting, partnership opportunity..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="valueProposition">Value Proposition</label>
+                <textarea id="valueProposition" name="valueProposition" placeholder="How your product/service helps them..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="callToAction">Call to Action</label>
+                <input type="text" id="callToAction" name="callToAction" placeholder="Schedule a call, Try free trial, Download guide">
+            </div>
+
+            <button type="submit" id="generateBtn">Generate Email</button>
+        </form>
+
+        <div id="result" class="result-container"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('emailForm');
+        const resultDiv = document.getElementById('result');
+        const generateBtn = document.getElementById('generateBtn');
+        let currentEmail = null;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const recipientName = document.getElementById('recipientName').value.trim();
+            const recipientCompany = document.getElementById('recipientCompany').value.trim();
+            const purpose = document.getElementById('purpose').value.trim();
+            const valueProposition = document.getElementById('valueProposition').value.trim();
+            const callToAction = document.getElementById('callToAction').value.trim();
+
+            if (!recipientName || !purpose) {
+                showError('Recipient name and purpose are required');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating Email...';
+            resultDiv.className = 'result-container loading';
+            resultDiv.textContent = 'Generating your cold email';
+            resultDiv.classList.add('show');
+
+            try {
+                const response = await fetch('/api/email/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ recipientName, recipientCompany, purpose, valueProposition, callToAction })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error + (data.details ? ': ' + data.details : ''));
+                } else if (data.success && data.email) {
+                    currentEmail = data.email;
+                    showEmail(data.email);
+                } else {
+                    showError('Unexpected response format');
+                }
+            } catch (error) {
+                showError('Failed to generate email: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Email';
+            }
+        });
+
+        function showEmail(email) {
+            const html = `
+                <div class="result-title">✅ Generated Cold Email</div>
+                <div class="result-content">${escapeHtml(email.content)}</div>
+                <button class="copy-btn" onclick="copyEmail()">📋 Copy Email</button>
+            `;
+
+            resultDiv.className = 'result-container show';
+            resultDiv.innerHTML = html;
+        }
+
+        function showError(message) {
+            resultDiv.className = 'result-container show error';
+            resultDiv.innerHTML = `<div class="result-title">❌ Error:</div><div>${escapeHtml(message)}</div>`;
+        }
+
+        function copyEmail() {
+            if (!currentEmail || !currentEmail.content) {
+                alert('No email to copy');
+                return;
+            }
+
+            navigator.clipboard.writeText(currentEmail.content).then(() => {
+                alert('Email copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err.message);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

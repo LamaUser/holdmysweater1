@@ -4,18 +4,25 @@ A comprehensive SaaS platform hosting multiple income-generating web tools, all 
 
 ## 🚀 Features
 
-This platform includes **5 independent income-generating tools**:
+This platform includes **10 independent income-generating tools**:
 
 1. **AI Content Generator** (`/content`) - Generate social media posts, blog content, and marketing copy
 2. **Lead Generator** (`/leads`) - Generate business leads and export to CSV
 3. **Digital Product Generator** (`/products`) - Create guides, templates, and digital products
 4. **Prompt Marketplace** (`/prompts`) - Generate and browse AI prompts
 5. **Trend Analyzer** (`/trends`) - Analyze industry trends and discover opportunities
+6. **Resume Generator** (`/resume`) - Create professional resumes and cover letters
+7. **Cold Email Generator** (`/email`) - Generate personalized cold emails
+8. **Newsletter Generator** (`/newsletter`) - Create engaging newsletters with trends
+9. **SEO Blog Generator** (`/seo`) - Write SEO-optimized blog posts
+10. **Simple AI API** (`/api`) - RESTful API for AI text generation
 
 ## 📋 Prerequisites
 
 - Node.js 18+ (ES Modules support)
 - A free HuggingFace API key ([Get one here](https://huggingface.co/settings/tokens))
+- Optional: OpenRouter API key ([Get one here](https://openrouter.ai/keys))
+- Optional: NewsAPI key ([Get one here](https://newsapi.org/register))
 
 ## 🛠️ Installation
 
@@ -30,9 +37,11 @@ This platform includes **5 independent income-generating tools**:
    ```bash
    cp .env.example .env
    ```
-   Then edit `.env` and add your HuggingFace API key:
+   Then edit `.env` and add your API keys:
    ```
    HUGGINGFACE_API_KEY=your_actual_api_key_here
+   OPENROUTER_API_KEY=your_openrouter_key_here  # Optional
+   NEWS_API_KEY=your_newsapi_key_here  # Optional
    ```
 
 4. **Start the server:**
@@ -57,6 +66,11 @@ This platform includes **5 independent income-generating tools**:
 - `/products` - Digital Product Generator
 - `/prompts` - Prompt Marketplace
 - `/trends` - Trend Analyzer
+- `/resume` - Resume & Cover Letter Generator
+- `/email` - Cold Email Generator
+- `/newsletter` - Newsletter Generator
+- `/seo` - SEO Blog Generator
+- `/api` - Simple AI API Documentation
 - `/health` - Health check endpoint
 
 ## 🚢 Deploying to Render
@@ -80,7 +94,9 @@ This platform includes **5 independent income-generating tools**:
 ### Step 3: Set Environment Variables
 
 In Render dashboard, go to your service → Environment:
-- Add `HUGGINGFACE_API_KEY` with your API key value
+- Add `HUGGINGFACE_API_KEY` with your API key value (required)
+- Add `OPENROUTER_API_KEY` (optional, for alternative AI models)
+- Add `NEWS_API_KEY` (optional, for news features)
 - `NODE_ENV` = `production` (optional)
 
 ### Step 4: Deploy
@@ -144,6 +160,63 @@ Analyze industry trends.
 }
 ```
 
+### POST `/api/resume/generate`
+Generate professional resume.
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "jobTitle": "Software Engineer",
+  "experience": "5 years...",
+  "skills": "JavaScript, React...",
+  "education": "BS Computer Science"
+}
+```
+
+### POST `/api/email/generate`
+Generate cold email.
+```json
+{
+  "recipientName": "Sarah Johnson",
+  "recipientCompany": "Tech Corp",
+  "purpose": "Partnership opportunity",
+  "valueProposition": "Increase revenue by 30%",
+  "callToAction": "Schedule a call"
+}
+```
+
+### POST `/api/newsletter/generate`
+Generate newsletter.
+```json
+{
+  "topic": "Technology trends",
+  "audience": "Entrepreneurs",
+  "sections": "weekly",
+  "includeTrends": true
+}
+```
+
+### POST `/api/seo/generate`
+Generate SEO blog post.
+```json
+{
+  "keyword": "best productivity apps",
+  "targetAudience": "Small business owners",
+  "wordCount": 1000,
+  "includeTrends": true
+}
+```
+
+### POST `/api/v1/generate`
+Simple AI API endpoint.
+```json
+{
+  "prompt": "Write a short story",
+  "maxTokens": 200,
+  "temperature": 0.7
+}
+```
+
 ### GET `/api/prompts/list`
 List available prompts.
 
@@ -184,9 +257,88 @@ The application includes comprehensive error handling:
 
 ## 🔑 API Configuration
 
-This project uses the **HuggingFace Inference API** (free tier available). The API key is read from `process.env.HUGGINGFACE_API_KEY`.
+This project uses multiple free APIs:
+- **HuggingFace Inference API** (primary) - Free tier available
+- **OpenRouter** (optional) - Alternative AI models
+- **Reddit Public API** - No authentication required
+- **NewsAPI** (optional) - Free tier available
 
-**Note**: If the API key is missing, the application will still run but return helpful error messages instead of crashing.
+API keys are read from environment variables. If keys are missing, the application will still run but return helpful error messages instead of crashing.
+
+## 💰 Monetization Strategies
+
+Each tool is designed with realistic monetization potential:
+
+### 1. AI Content Generator
+- **Freemium Model**: Free for 10 generations/month, then $9.99/month
+- **Affiliate Links**: Add affiliate links to recommended tools/products
+- **Brand Partnerships**: Sponsored content templates
+- **API Access**: Charge per API call for integrations
+
+### 2. Lead Generator
+- **Pay-per-Lead**: $0.50-$2.00 per verified lead
+- **Subscription**: $49/month for unlimited leads
+- **CSV Export**: Free tier limits exports, premium unlocks unlimited
+- **B2B Service**: White-label for agencies ($199/month)
+
+### 3. Digital Product Generator
+- **Marketplace**: Sell generated products on Gumroad/Etsy (30% commission)
+- **Subscription**: $19/month for unlimited product generation
+- **Custom Products**: $99 one-time for custom-branded products
+- **Templates Library**: Premium templates pack ($29)
+
+### 4. Prompt Marketplace
+- **Prompt Packs**: Sell curated prompt bundles ($9.99-$49.99)
+- **Subscription**: $14.99/month for unlimited premium prompts
+- **Custom Prompts**: $4.99 per custom prompt generation
+- **API Access**: Developers pay $0.01 per prompt API call
+
+### 5. Trend Analyzer
+- **Trend Reports**: Sell monthly trend reports ($29/month)
+- **Premium Access**: $49/month for real-time alerts
+- **API Access**: $99/month for API access to trend data
+- **Consulting**: Upsell trend analysis consulting ($199/hour)
+
+### 6. Resume Generator
+- **Pay-per-Download**: $4.99 per resume download
+- **Premium Templates**: $9.99/month for premium templates
+- **ATS Optimization**: $19.99 for ATS-optimized resume
+- **Career Services**: Upsell to resume review services ($49)
+
+### 7. Cold Email Generator
+- **B2B Service**: $99/month for unlimited emails
+- **Per-Email Pricing**: $0.10 per email generated
+- **Agency Plans**: $299/month for agencies (white-label)
+- **Email Warm-up**: Add-on service ($49/month)
+
+### 8. Newsletter Generator
+- **Subscription**: $29/month for unlimited newsletters
+- **Sponsored Content**: Add sponsored sections ($99/sponsor)
+- **Newsletter Hosting**: Host newsletters for $19/month
+- **Custom Branding**: $49/month for custom-branded newsletters
+
+### 9. SEO Blog Generator
+- **Per-Article**: $9.99 per SEO article
+- **Monthly Plans**: $79/month for 10 articles
+- **SEO Audit**: Add-on service ($149 per audit)
+- **Content Marketing**: Full-service packages ($499/month)
+
+### 10. Simple AI API
+- **Usage-Based**: $0.01 per 100 tokens
+- **Tiered Pricing**: 
+  - Free: 10,000 tokens/month
+  - Pro: $29/month for 1M tokens
+  - Enterprise: Custom pricing
+- **API Keys**: Charge for API access
+- **Rate Limits**: Higher limits for paid tiers
+
+### General Monetization Tips:
+- **Freemium Model**: Always offer a free tier to attract users
+- **Payment Integration**: Add Stripe/PayPal for subscriptions
+- **Analytics**: Track usage to identify premium features
+- **Email Collection**: Build email list for marketing
+- **Upsells**: Offer premium features within free tools
+- **Affiliate Marketing**: Add affiliate links where relevant
 
 ## 💡 Usage Tips
 

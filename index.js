@@ -457,6 +457,434 @@ app.post('/api/trends/analyze', async (req, res) => {
   }
 });
 
+// Helper function to call OpenRouter API (free models)
+async function callOpenRouterAPI(prompt, model = 'mistralai/mistral-7b-instruct:free') {
+  try {
+    const apiKey = process.env.OPENROUTER_API_KEY || '';
+    
+    if (!apiKey) {
+      return {
+        error: 'OpenRouter API key not configured. Please set OPENROUTER_API_KEY in your environment variables.',
+        suggestion: 'Get a free API key from https://openrouter.ai/keys'
+      };
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        error: `OpenRouter API request failed: ${response.status} ${response.statusText}`,
+        details: errorText.substring(0, 200)
+      };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    return { success: true, data: { text: content } };
+  } catch (error) {
+    return {
+      error: 'Failed to connect to OpenRouter service',
+      details: error.message
+    };
+  }
+}
+
+// Helper function to fetch Reddit trends
+async function fetchRedditTrends(subreddit = 'all', limit = 10) {
+  try {
+    const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SaaS Tool/1.0)'
+      }
+    });
+
+    if (!response.ok) {
+      return {
+        error: `Reddit API request failed: ${response.status}`,
+        details: 'Unable to fetch Reddit trends'
+      };
+    }
+
+    const data = await response.json();
+    const posts = data.data?.children?.map(child => ({
+      title: child.data.title,
+      score: child.data.score,
+      subreddit: child.data.subreddit,
+      url: `https://reddit.com${child.data.permalink}`,
+      created: new Date(child.data.created_utc * 1000).toISOString()
+    })) || [];
+
+    return { success: true, data: { posts } };
+  } catch (error) {
+    return {
+      error: 'Failed to fetch Reddit trends',
+      details: error.message
+    };
+  }
+}
+
+// Helper function to fetch NewsAPI (optional)
+async function fetchNewsAPI(query, apiKey) {
+  try {
+    if (!apiKey) {
+      return {
+        error: 'NewsAPI key not configured',
+        suggestion: 'Set NEWS_API_KEY in environment variables (optional)'
+      };
+    }
+
+    const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=popularity&pageSize=5&apiKey=${apiKey}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      return {
+        error: `NewsAPI request failed: ${response.status}`,
+        details: 'Unable to fetch news'
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, data: { articles: data.articles || [] } };
+  } catch (error) {
+    return {
+      error: 'Failed to fetch news',
+      details: error.message
+    };
+  }
+}
+
+// Route: Resume Generator
+app.get('/resume', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'resume', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving resume page:', err);
+      res.status(500).json({ error: 'Failed to load resume generator page' });
+    }
+  });
+});
+
+app.post('/api/resume/generate', async (req, res) => {
+  try {
+    const { name, email, phone, jobTitle, experience, skills, education } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    if (!jobTitle || typeof jobTitle !== 'string' || jobTitle.trim().length === 0) {
+      return res.status(400).json({ error: 'Job title is required' });
+    }
+
+    const prompt = `Create a professional resume for ${name} applying for a ${jobTitle} position. ${experience ? `Experience: ${experience}. ` : ''}${skills ? `Skills: ${skills}. ` : ''}${education ? `Education: ${education}. ` : ''}Include: Professional Summary, Work Experience, Skills, Education sections. Format as clean, professional resume text.`;
+
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+      max_new_tokens: 600,
+      temperature: 0.6
+    });
+
+    if (result.error) {
+      return res.status(500).json(result);
+    }
+
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || JSON.stringify(result.data);
+    } else {
+      generatedText = String(result.data);
+    }
+
+    const resumeContent = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
+
+    res.json({
+      success: true,
+      resume: {
+        name,
+        email: email || '',
+        phone: phone || '',
+        jobTitle,
+        content: resumeContent,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+// Route: Cold Email Generator
+app.get('/email', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'email', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving email page:', err);
+      res.status(500).json({ error: 'Failed to load email generator page' });
+    }
+  });
+});
+
+app.post('/api/email/generate', async (req, res) => {
+  try {
+    const { recipientName, recipientCompany, purpose, valueProposition, callToAction } = req.body;
+
+    if (!recipientName || typeof recipientName !== 'string' || recipientName.trim().length === 0) {
+      return res.status(400).json({ error: 'Recipient name is required' });
+    }
+
+    if (!purpose || typeof purpose !== 'string' || purpose.trim().length === 0) {
+      return res.status(400).json({ error: 'Email purpose is required' });
+    }
+
+    const prompt = `Write a professional cold email to ${recipientName}${recipientCompany ? ` at ${recipientCompany}` : ''}. Purpose: ${purpose}. ${valueProposition ? `Value proposition: ${valueProposition}. ` : ''}${callToAction ? `Call to action: ${callToAction}. ` : ''}Make it personalized, concise, and compelling. Include subject line.`;
+
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+      max_new_tokens: 300,
+      temperature: 0.7
+    });
+
+    if (result.error) {
+      return res.status(500).json(result);
+    }
+
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || JSON.stringify(result.data);
+    } else {
+      generatedText = String(result.data);
+    }
+
+    const emailContent = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
+
+    res.json({
+      success: true,
+      email: {
+        recipientName,
+        recipientCompany: recipientCompany || '',
+        purpose,
+        content: emailContent,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+// Route: Newsletter Generator
+app.get('/newsletter', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'newsletter', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving newsletter page:', err);
+      res.status(500).json({ error: 'Failed to load newsletter generator page' });
+    }
+  });
+});
+
+app.post('/api/newsletter/generate', async (req, res) => {
+  try {
+    const { topic, audience, sections, includeTrends } = req.body;
+
+    if (!topic || typeof topic !== 'string' || topic.trim().length === 0) {
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    let trendsData = null;
+    if (includeTrends) {
+      const redditResult = await fetchRedditTrends(topic.replace(/\s+/g, ''), 5);
+      if (redditResult.success) {
+        trendsData = redditResult.data.posts;
+      }
+    }
+
+    const prompt = `Create a ${sections || 'weekly'} newsletter about ${topic} for ${audience || 'general audience'}. ${trendsData ? `Include trending topics: ${trendsData.map(p => p.title).join(', ')}. ` : ''}Include: engaging subject line, introduction, main stories, and conclusion. Make it informative and engaging.`;
+
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+      max_new_tokens: 800,
+      temperature: 0.7
+    });
+
+    if (result.error) {
+      return res.status(500).json(result);
+    }
+
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || JSON.stringify(result.data);
+    } else {
+      generatedText = String(result.data);
+    }
+
+    const newsletterContent = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
+
+    res.json({
+      success: true,
+      newsletter: {
+        topic,
+        audience: audience || 'general audience',
+        sections: sections || 'weekly',
+        content: newsletterContent,
+        trends: trendsData,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+// Route: SEO Blog Generator
+app.get('/seo', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'seo', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving seo page:', err);
+      res.status(500).json({ error: 'Failed to load SEO blog generator page' });
+    }
+  });
+});
+
+app.post('/api/seo/generate', async (req, res) => {
+  try {
+    const { keyword, targetAudience, wordCount, includeTrends } = req.body;
+
+    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+      return res.status(400).json({ error: 'Keyword is required' });
+    }
+
+    let trendsData = null;
+    if (includeTrends) {
+      const redditResult = await fetchRedditTrends('all', 10);
+      if (redditResult.success) {
+        trendsData = redditResult.data.posts.filter(p => 
+          p.title.toLowerCase().includes(keyword.toLowerCase()) || 
+          p.subreddit.toLowerCase().includes(keyword.toLowerCase())
+        ).slice(0, 5);
+      }
+    }
+
+    const prompt = `Write a comprehensive SEO-optimized blog post targeting the keyword "${keyword}" for ${targetAudience || 'general readers'}. Target word count: ${wordCount || 1000} words. ${trendsData ? `Reference these trending topics: ${trendsData.map(p => p.title).join(', ')}. ` : ''}Include: SEO-optimized title, meta description, H1-H3 headings, keyword-rich content, and conclusion. Make it valuable and search-engine friendly.`;
+
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+      max_new_tokens: 1000,
+      temperature: 0.7
+    });
+
+    if (result.error) {
+      return res.status(500).json(result);
+    }
+
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || JSON.stringify(result.data);
+    } else {
+      generatedText = String(result.data);
+    }
+
+    const blogContent = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
+
+    res.json({
+      success: true,
+      blog: {
+        keyword,
+        targetAudience: targetAudience || 'general readers',
+        wordCount: blogContent.split(/\s+/).length,
+        content: blogContent,
+        trends: trendsData,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+// Route: Simple AI API (SaaS endpoint)
+app.get('/api', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'api', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving api page:', err);
+      res.status(500).json({ error: 'Failed to load API documentation page' });
+    }
+  });
+});
+
+app.post('/api/v1/generate', async (req, res) => {
+  try {
+    const { prompt, model, maxTokens, temperature } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+      max_new_tokens: maxTokens || 200,
+      temperature: temperature || 0.7
+    });
+
+    if (result.error) {
+      return res.status(500).json(result);
+    }
+
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || JSON.stringify(result.data);
+    } else {
+      generatedText = String(result.data);
+    }
+
+    const cleanText = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
+
+    res.json({
+      success: true,
+      data: {
+        text: cleanText,
+        model: model || 'mistralai/Mistral-7B-Instruct-v0.2',
+        tokens: cleanText.split(/\s+/).length,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
