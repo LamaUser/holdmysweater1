@@ -258,12 +258,16 @@ The application includes comprehensive error handling:
 ## 🔑 API Configuration
 
 This project uses multiple free APIs:
-- **HuggingFace Inference API** (primary) - Free tier available
+- **HuggingFace Inference API** (primary) - Uses new router endpoint: `https://router.huggingface.co/hf-inference/models/{model}`
+  - Model: `mistralai/Mistral-7B-Instruct`
+  - Free tier available
 - **OpenRouter** (optional) - Alternative AI models
 - **Reddit Public API** - No authentication required
 - **NewsAPI** (optional) - Free tier available
 
 API keys are read from environment variables. If keys are missing, the application will still run but return helpful error messages instead of crashing.
+
+**Important**: This project uses the updated HuggingFace router endpoint. The deprecated `api-inference.huggingface.co` endpoint is no longer used.
 
 ## 💰 Monetization Strategies
 

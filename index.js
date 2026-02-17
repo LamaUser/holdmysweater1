@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files from public directory (CSS, JS, images, etc.)
 app.use(express.static(join(__dirname, 'public')));
 
-// Helper function to safely call HuggingFace API
+// Helper function to safely call HuggingFace API (using new router endpoint)
 async function callHuggingFaceAPI(model, inputs, options = {}) {
   try {
     const apiKey = process.env.HUGGINGFACE_API_KEY || '';
@@ -28,8 +28,9 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
       };
     }
 
+    // Use new router endpoint: https://router.huggingface.co/hf-inference/models/{model_name}
     const response = await fetch(
-      `https://api-inference.huggingface.co/models/${model}`,
+      `https://router.huggingface.co/hf-inference/models/${model}`,
       {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -49,6 +50,16 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
         errorDetails = 'Model is currently loading. Please try again in a few moments.';
       }
       
+      // Handle 404 for invalid models
+      if (response.status === 404) {
+        errorDetails = 'Model not found. Please check the model name.';
+      }
+      
+      // Handle rate limiting
+      if (response.status === 429) {
+        errorDetails = 'Rate limit exceeded. Please try again later.';
+      }
+      
       return {
         error: `API request failed: ${response.status} ${response.statusText}`,
         details: errorDetails
@@ -57,8 +68,15 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
 
     const data = await response.json();
     
-    // Handle array responses
-    if (Array.isArray(data) && data.length > 0) {
+    // Handle array responses (common in new API format)
+    if (Array.isArray(data)) {
+      if (data.length === 0) {
+        return {
+          error: 'Empty response from API',
+          details: 'The API returned an empty array'
+        };
+      }
+      // Return first element if array contains objects
       return { success: true, data: data[0] };
     }
     
@@ -66,7 +84,15 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
     if (data.error) {
       return {
         error: data.error,
-        details: data.error || 'Unknown API error'
+        details: typeof data.error === 'string' ? data.error : JSON.stringify(data.error)
+      };
+    }
+    
+    // Handle object responses with error field
+    if (data.error_message) {
+      return {
+        error: data.error_message,
+        details: data.error_message
       };
     }
     
@@ -109,7 +135,7 @@ app.post('/api/content/generate', async (req, res) => {
 
     const prompt = `Create a ${type || 'social media post'} about "${topic}" in a ${tone || 'engaging'} tone. Make it compelling and ready to use.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 200,
       temperature: 0.7
     });
@@ -168,7 +194,7 @@ app.post('/api/leads/generate', async (req, res) => {
     // Generate business leads using AI
     const prompt = `Generate a list of 5 real business leads in the ${industry} industry${location ? ` located in ${location}` : ''}${companySize ? ` with ${companySize} employees` : ''}. Format as JSON array with fields: companyName, contactEmail, contactName, phone, website, address.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 300,
       temperature: 0.7
     });
@@ -258,7 +284,7 @@ app.post('/api/products/generate', async (req, res) => {
 
     const prompt = `Create a ${productType} about "${topic}" in ${format || 'markdown'} format. Include a title, introduction, main content sections, and conclusion. Make it comprehensive and valuable.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 500,
       temperature: 0.7
     });
@@ -320,7 +346,7 @@ app.post('/api/prompts/generate', async (req, res) => {
 
     const prompt = `Create a high-quality AI prompt for ${category}${useCase ? ` specifically for ${useCase}` : ''}${style ? ` in a ${style} style` : ''}. Make it detailed, effective, and ready to use. Include the prompt text, description, and use cases.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 300,
       temperature: 0.7
     });
@@ -416,7 +442,7 @@ app.post('/api/trends/analyze', async (req, res) => {
 
     const prompt = `Analyze current trends in the ${industry} industry${timeframe ? ` for the ${timeframe}` : ''}${focus ? ` focusing on ${focus}` : ''}. Provide: 1) Top 5 trends, 2) Market opportunities, 3) Emerging technologies, 4) Consumer behavior shifts, 5) Business ideas. Format as structured analysis.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 400,
       temperature: 0.7
     });
@@ -592,7 +618,7 @@ app.post('/api/resume/generate', async (req, res) => {
 
     const prompt = `Create a professional resume for ${name} applying for a ${jobTitle} position. ${experience ? `Experience: ${experience}. ` : ''}${skills ? `Skills: ${skills}. ` : ''}${education ? `Education: ${education}. ` : ''}Include: Professional Summary, Work Experience, Skills, Education sections. Format as clean, professional resume text.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 600,
       temperature: 0.6
     });
@@ -655,7 +681,7 @@ app.post('/api/email/generate', async (req, res) => {
 
     const prompt = `Write a professional cold email to ${recipientName}${recipientCompany ? ` at ${recipientCompany}` : ''}. Purpose: ${purpose}. ${valueProposition ? `Value proposition: ${valueProposition}. ` : ''}${callToAction ? `Call to action: ${callToAction}. ` : ''}Make it personalized, concise, and compelling. Include subject line.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 300,
       temperature: 0.7
     });
@@ -721,7 +747,7 @@ app.post('/api/newsletter/generate', async (req, res) => {
 
     const prompt = `Create a ${sections || 'weekly'} newsletter about ${topic} for ${audience || 'general audience'}. ${trendsData ? `Include trending topics: ${trendsData.map(p => p.title).join(', ')}. ` : ''}Include: engaging subject line, introduction, main stories, and conclusion. Make it informative and engaging.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 800,
       temperature: 0.7
     });
@@ -791,7 +817,7 @@ app.post('/api/seo/generate', async (req, res) => {
 
     const prompt = `Write a comprehensive SEO-optimized blog post targeting the keyword "${keyword}" for ${targetAudience || 'general readers'}. Target word count: ${wordCount || 1000} words. ${trendsData ? `Reference these trending topics: ${trendsData.map(p => p.title).join(', ')}. ` : ''}Include: SEO-optimized title, meta description, H1-H3 headings, keyword-rich content, and conclusion. Make it valuable and search-engine friendly.`;
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: 1000,
       temperature: 0.7
     });
@@ -848,7 +874,7 @@ app.post('/api/v1/generate', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct-v0.2', prompt, {
+    const result = await callHuggingFaceAPI('mistralai/Mistral-7B-Instruct', prompt, {
       max_new_tokens: maxTokens || 200,
       temperature: temperature || 0.7
     });
@@ -872,7 +898,7 @@ app.post('/api/v1/generate', async (req, res) => {
       success: true,
       data: {
         text: cleanText,
-        model: model || 'mistralai/Mistral-7B-Instruct-v0.2',
+        model: model || 'mistralai/Mistral-7B-Instruct',
         tokens: cleanText.split(/\s+/).length,
         createdAt: new Date().toISOString()
       }
