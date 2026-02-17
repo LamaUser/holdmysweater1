@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files from public directory
+// Serve static files from public directory (CSS, JS, images, etc.)
 app.use(express.static(join(__dirname, 'public')));
 
 // Helper function to safely call HuggingFace API
@@ -42,13 +42,34 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorDetails = errorText.substring(0, 200);
+      
+      // Handle model loading errors
+      if (response.status === 503) {
+        errorDetails = 'Model is currently loading. Please try again in a few moments.';
+      }
+      
       return {
         error: `API request failed: ${response.status} ${response.statusText}`,
-        details: errorText.substring(0, 200)
+        details: errorDetails
       };
     }
 
     const data = await response.json();
+    
+    // Handle array responses
+    if (Array.isArray(data) && data.length > 0) {
+      return { success: true, data: data[0] };
+    }
+    
+    // Handle error responses from API
+    if (data.error) {
+      return {
+        error: data.error,
+        details: data.error || 'Unknown API error'
+      };
+    }
+    
     return { success: true, data };
   } catch (error) {
     return {
@@ -60,12 +81,22 @@ async function callHuggingFaceAPI(model, inputs, options = {}) {
 
 // Route: Landing page
 app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving landing page:', err);
+      res.status(500).json({ error: 'Failed to load landing page' });
+    }
+  });
 });
 
 // Route: AI Content Generator
 app.get('/content', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'content', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'content', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving content page:', err);
+      res.status(500).json({ error: 'Failed to load content generator page' });
+    }
+  });
 });
 
 app.post('/api/content/generate', async (req, res) => {
@@ -87,13 +118,24 @@ app.post('/api/content/generate', async (req, res) => {
       return res.status(500).json(result);
     }
 
-    const generatedText = Array.isArray(result.data) 
-      ? result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data)
-      : result.data?.generated_text || result.data?.text || JSON.stringify(result.data);
+    // Extract text from various response formats
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || result.data[0]?.summary || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || result.data.summary || result.data[0]?.generated_text || JSON.stringify(result.data);
+    } else if (typeof result.data === 'string') {
+      generatedText = result.data;
+    } else {
+      generatedText = JSON.stringify(result.data);
+    }
+
+    // Clean up the text (remove prompt if present)
+    const cleanText = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
 
     res.json({
       success: true,
-      content: generatedText.replace(prompt, '').trim() || generatedText,
+      content: cleanText || 'Content generated successfully',
       topic,
       type: type || 'social media post'
     });
@@ -107,7 +149,12 @@ app.post('/api/content/generate', async (req, res) => {
 
 // Route: Lead Generator
 app.get('/leads', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'leads', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'leads', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving leads page:', err);
+      res.status(500).json({ error: 'Failed to load leads generator page' });
+    }
+  });
 });
 
 app.post('/api/leads/generate', async (req, res) => {
@@ -130,9 +177,17 @@ app.post('/api/leads/generate', async (req, res) => {
       return res.status(500).json(result);
     }
 
-    const generatedText = Array.isArray(result.data) 
-      ? result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data)
-      : result.data?.generated_text || result.data?.text || JSON.stringify(result.data);
+    // Extract text from various response formats
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || result.data[0]?.summary || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || result.data.summary || result.data[0]?.generated_text || JSON.stringify(result.data);
+    } else if (typeof result.data === 'string') {
+      generatedText = result.data;
+    } else {
+      generatedText = JSON.stringify(result.data);
+    }
 
     // Try to parse JSON from response, fallback to structured data
     let leads = [];
@@ -181,7 +236,12 @@ app.post('/api/leads/generate', async (req, res) => {
 
 // Route: Digital Product Generator
 app.get('/products', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'products', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'products', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving products page:', err);
+      res.status(500).json({ error: 'Failed to load products generator page' });
+    }
+  });
 });
 
 app.post('/api/products/generate', async (req, res) => {
@@ -207,11 +267,19 @@ app.post('/api/products/generate', async (req, res) => {
       return res.status(500).json(result);
     }
 
-    const generatedText = Array.isArray(result.data) 
-      ? result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data)
-      : result.data?.generated_text || result.data?.text || JSON.stringify(result.data);
+    // Extract text from various response formats
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || result.data[0]?.summary || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || result.data.summary || result.data[0]?.generated_text || JSON.stringify(result.data);
+    } else if (typeof result.data === 'string') {
+      generatedText = result.data;
+    } else {
+      generatedText = JSON.stringify(result.data);
+    }
 
-    const content = generatedText.replace(prompt, '').trim() || generatedText;
+    const content = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
 
     res.json({
       success: true,
@@ -234,7 +302,12 @@ app.post('/api/products/generate', async (req, res) => {
 
 // Route: Prompt Marketplace
 app.get('/prompts', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'prompts', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'prompts', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving prompts page:', err);
+      res.status(500).json({ error: 'Failed to load prompts marketplace page' });
+    }
+  });
 });
 
 app.post('/api/prompts/generate', async (req, res) => {
@@ -256,11 +329,19 @@ app.post('/api/prompts/generate', async (req, res) => {
       return res.status(500).json(result);
     }
 
-    const generatedText = Array.isArray(result.data) 
-      ? result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data)
-      : result.data?.generated_text || result.data?.text || JSON.stringify(result.data);
+    // Extract text from various response formats
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || result.data[0]?.summary || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || result.data.summary || result.data[0]?.generated_text || JSON.stringify(result.data);
+    } else if (typeof result.data === 'string') {
+      generatedText = result.data;
+    } else {
+      generatedText = JSON.stringify(result.data);
+    }
 
-    const promptText = generatedText.replace(prompt, '').trim() || generatedText;
+    const promptText = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
 
     res.json({
       success: true,
@@ -317,7 +398,12 @@ app.get('/api/prompts/list', async (req, res) => {
 
 // Route: Trend Analyzer
 app.get('/trends', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'trends', 'index.html'));
+  res.sendFile(join(__dirname, 'public', 'trends', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving trends page:', err);
+      res.status(500).json({ error: 'Failed to load trends analyzer page' });
+    }
+  });
 });
 
 app.post('/api/trends/analyze', async (req, res) => {
@@ -339,11 +425,19 @@ app.post('/api/trends/analyze', async (req, res) => {
       return res.status(500).json(result);
     }
 
-    const generatedText = Array.isArray(result.data) 
-      ? result.data[0]?.generated_text || result.data[0]?.text || JSON.stringify(result.data)
-      : result.data?.generated_text || result.data?.text || JSON.stringify(result.data);
+    // Extract text from various response formats
+    let generatedText = '';
+    if (Array.isArray(result.data)) {
+      generatedText = result.data[0]?.generated_text || result.data[0]?.text || result.data[0]?.summary || JSON.stringify(result.data[0]);
+    } else if (typeof result.data === 'object') {
+      generatedText = result.data.generated_text || result.data.text || result.data.summary || result.data[0]?.generated_text || JSON.stringify(result.data);
+    } else if (typeof result.data === 'string') {
+      generatedText = result.data;
+    } else {
+      generatedText = JSON.stringify(result.data);
+    }
 
-    const analysis = generatedText.replace(prompt, '').trim() || generatedText;
+    const analysis = generatedText.replace(prompt, '').replace(/^[\s\n]+|[\s\n]+$/g, '').trim() || generatedText.trim();
 
     res.json({
       success: true,
@@ -374,10 +468,32 @@ app.get('/health', (req, res) => {
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.path
-  });
+  // If it's an API route, return JSON
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      error: 'API endpoint not found',
+      path: req.path
+    });
+  }
+  // Otherwise, try to serve a 404 page or redirect to home
+  res.status(404).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>404 - Page Not Found</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #667eea; }
+        a { color: #667eea; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <h1>404 - Page Not Found</h1>
+      <p>The page you're looking for doesn't exist.</p>
+      <a href="/">← Go back to home</a>
+    </body>
+    </html>
+  `);
 });
 
 // Global error handler
